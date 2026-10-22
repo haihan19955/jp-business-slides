@@ -1,0 +1,18 @@
+{
+    "name":  "jp-business-slides",
+    "version":  "1.0.0",
+    "description":  "Claude skill for Japanese business decks with automatic Japanese line-break (nakiwakare) fixing",
+    "main":  "index.js",
+    "scripts":  {
+                    "test":  "echo \"Error: no test specified\" \u0026\u0026 exit 1"
+                },
+    "keywords":  [
+
+                 ],
+    "author":  "",
+    "license":  "MIT",
+    "type":  "commonjs",
+    "dependencies":  {
+                         "pptxgenjs":  "^3.12.0"
+                     }
+}
