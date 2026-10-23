@@ -15,7 +15,9 @@ AI にスライドを作らせると、日本語は「専用｜フォルダ」�
 
 までを自動で行います。このスキルで作った資料だけでなく、**手元にある既存の .pptx にも使えます。**
 
-解説記事（note）：[AIが作ったパワポの「泣き別れ」を自動で直す。Claude Code用スキルを無料公開しました](https://note.com/glad_moose4636/n/n752279cadf64)
+解説記事：
+- note（使い方の紹介）：[AIが作ったパワポの「泣き別れ」を自動で直す。Claude Code用スキルを無料公開しました](https://note.com/glad_moose4636/n/n752279cadf64)
+- Zenn（実装の解説）：[PowerPointの日本語「泣き別れ」を、PowerPoint自身に改行位置を聞いて自動で直す](https://zenn.dev/haihan19955/articles/93a10be81996a8)
 
 ![修正前後の比較](images/before_after_process.png)
 
