@@ -3,7 +3,7 @@
 **日本語のパワポ資料を「そのまま社外に出せる」品質で作る Claude スキル。**
 PowerPoint 実機の改行位置を調べて、単語の途中で切れる「泣き別れ」を自動で直します。
 
-![修正前後の比較](images/before_after_process.png)
+![デモ：修正前 → jp_fix_wrap.py → 修正後](images/demo.gif)
 
 AI にスライドを作らせると、日本語は「専用｜フォルダ」「API経｜由」のように単語の途中で改行されがちです。PowerPoint には日本語を文節で折り返す機能がないため、人が1か所ずつ Shift+Enter で直すしかありませんでした。
 
@@ -16,6 +16,8 @@ AI にスライドを作らせると、日本語は「専用｜フォルダ」�
 までを自動で行います。このスキルで作った資料だけでなく、**手元にある既存の .pptx にも使えます。**
 
 解説記事（note）：[AIが作ったパワポの「泣き別れ」を自動で直す。Claude Code用スキルを無料公開しました](https://note.com/glad_moose4636/n/n752279cadf64)
+
+![修正前後の比較](images/before_after_process.png)
 
 ![修正前後の比較（KPIカード）](images/before_after_kpi.png)
 

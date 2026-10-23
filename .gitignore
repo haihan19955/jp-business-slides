@@ -7,3 +7,4 @@ examples/*.json
 tests/*.pptx
 tests/*.json
 ~$*.pptx
+tests/*.png
