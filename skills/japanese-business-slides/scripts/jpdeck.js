@@ -5,6 +5,9 @@
 const PptxGenJS = require("pptxgenjs");
 
 const W = 13.333, H = 7.5, MX = 0.5;
+// テキストの言語。en-US（pptxgenjs の既定）のままだと PowerPoint が日本語の禁則処理をせず、
+// 「、」や「）」が行頭に来る（tests/wrap_corpus.js の 600 ボックスで 67 か所 → ja-JP にすると 0 か所）
+const LANG = "ja-JP";
 const CW = W - MX * 2;
 
 const PALETTES = {
@@ -26,7 +29,7 @@ function createDeck(opts = {}) {
 
   const titleOpts = {
     x: MX, y: 0.3, w: CW, h: 0.95, fontFace: font, fontSize: 22, bold: true,
-    color: P.primary, align: "left", valign: "middle", margin: 0, lineSpacingMultiple: 1.1,
+    color: P.primary, align: "left", valign: "middle", margin: 0, lineSpacingMultiple: 1.1, lang: LANG,
   };
   pres.defineSlideMaster({
     title: "JP_CONTENT",
@@ -40,12 +43,14 @@ function createDeck(opts = {}) {
   });
   pres.defineSlideMaster({ title: "JP_PLAIN", background: { color: "FFFFFF" }, objects: [] });
 
-  const T = (o) => ({ fontFace: font, color: P.text, margin: 0, isTextBox: true, ...o });
+  const T = (o) => ({ fontFace: font, color: P.text, margin: 0, isTextBox: true, lang: LANG, ...o });
+  // 表のセル。表全体に lang を渡してもセルには反映されないので、セルごとに指定する
+  const cell = (text, options = {}) => ({ text, options: { lang: LANG, ...options } });
 
   // 共通: タイトル（＝メッセージ）・リード・結論ボックス・出所
   function content({ title, lead, bottomLine, source, notes }) {
     const s = pres.addSlide({ masterName: "JP_CONTENT" });
-    s.addText(title, { placeholder: "title" });
+    s.addText(title, { placeholder: "title", lang: LANG });
     let top = 1.4, bottom = 6.85;
     if (lead) {
       s.addText(lead, T({ x: MX, y: 1.3, w: CW, h: 0.5, fontSize: 14, color: P.sub, valign: "top", objectName: "lead" }));
@@ -127,16 +132,14 @@ function createDeck(opts = {}) {
     compare({ title, lead, columns, rows, highlight, source, notes }) {
       const { s, top, bottom } = content(arguments[0]);
       const labelW = 2.3, colW = (CW - labelW) / columns.length;
-      const head = [{ text: "", options: { fill: { color: "FFFFFF" } } }].concat(columns.map((c, i) => ({
-        text: c, options: { bold: true, color: "FFFFFF", fill: { color: i === highlight ? P.accent : P.primary }, align: "center" },
-      })));
-      const body = rows.map((r) => [{ text: r.label, options: { bold: true, color: P.primary, fill: { color: P.tint } } }].concat(r.values.map((v, i) => ({
-        text: v, options: { fill: { color: i === highlight ? P.tintAccent : "FFFFFF" }, bold: i === highlight },
-      }))));
+      const head = [cell("", { fill: { color: "FFFFFF" } })].concat(columns.map((c, i) =>
+        cell(c, { bold: true, color: "FFFFFF", fill: { color: i === highlight ? P.accent : P.primary }, align: "center" })));
+      const body = rows.map((r) => [cell(r.label, { bold: true, color: P.primary, fill: { color: P.tint } })].concat(r.values.map((v, i) =>
+        cell(v, { fill: { color: i === highlight ? P.tintAccent : "FFFFFF" }, bold: i === highlight }))));
       const rowH = Math.min(0.85, (bottom - top) / (rows.length + 1));
       s.addTable([head, ...body], {
         x: MX, y: top, w: CW, colW: [labelW, ...columns.map(() => colW)], rowH,
-        fontFace: font, fontSize: 13, color: P.text, valign: "middle", margin: [0.05, 0.12, 0.05, 0.12],
+        fontFace: font, fontSize: 13, color: P.text, valign: "middle", margin: [0.05, 0.12, 0.05, 0.12], lang: LANG,
         border: { type: "solid", pt: 0.75, color: P.line },
       });
       return s;
@@ -178,7 +181,7 @@ function createDeck(opts = {}) {
         s.addText([
           { text: c.value, options: { fontSize: 54, bold: true, color: P.accent } },
           { text: c.unit ? " " + c.unit : "", options: { fontSize: 20, bold: true, color: P.accent } },
-        ], T({ x: x + 0.3, y: y0 + 0.6, w: cw - 0.6, h: 1.2, valign: "middle" }));
+        ], T({ x: x + 0.3, y: y0 + 0.55, w: cw - 0.6, h: 1.4, valign: "middle" }));  // 54pt は ja-JP だと行が高くなるので余裕をとる
         if (c.note) s.addText(c.note, T({ x: x + 0.3, y: y0 + 2.0, w: cw - 0.6, h: 1.1, fontSize: 13, color: P.text, valign: "top" }));
       });
       return s;
@@ -253,14 +256,14 @@ function createDeck(opts = {}) {
     // ネクストステップ（何を・誰が・いつまでに）
     nextSteps({ title, lead, items, source, notes }) {
       const { s, top, bottom } = content(arguments[0]);
-      const head = ["#", "実施事項", "担当", "期限"].map((t) => ({ text: t, options: { bold: true, color: "FFFFFF", fill: { color: P.primary }, align: "center" } }));
+      const head = ["#", "実施事項", "担当", "期限"].map((t) => cell(t, { bold: true, color: "FFFFFF", fill: { color: P.primary }, align: "center" }));
       const body = items.map((it, i) => [
-        { text: String(i + 1), options: { align: "center", bold: true, color: P.accent } },
-        { text: it.what }, { text: it.who, options: { align: "center" } }, { text: it.when, options: { align: "center" } },
+        cell(String(i + 1), { align: "center", bold: true, color: P.accent }),
+        cell(it.what), cell(it.who, { align: "center" }), cell(it.when, { align: "center" }),
       ]);
       s.addTable([head, ...body], {
         x: MX, y: top, w: CW, colW: [0.6, CW - 0.6 - 2.4 - 2.0, 2.4, 2.0], rowH: Math.min(0.8, (bottom - top) / (items.length + 1)),
-        fontFace: font, fontSize: 13, color: P.text, valign: "middle", margin: [0.05, 0.12, 0.05, 0.12],
+        fontFace: font, fontSize: 13, color: P.text, valign: "middle", margin: [0.05, 0.12, 0.05, 0.12], lang: LANG,
         border: { type: "solid", pt: 0.75, color: P.line },
       });
       return s;

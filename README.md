@@ -1,7 +1,7 @@
 # japanese-business-slides
 
 **日本語のパワポ資料を「そのまま社外に出せる」品質で作る Claude スキル。**
-PowerPoint 実機の改行位置を調べて、単語の途中で切れる「泣き別れ」を自動で直します。
+PowerPoint の改行位置を調べて、単語の途中で切れる「泣き別れ」と、「、」が行頭に来る禁則違反を自動で直します。Windows は PowerPoint 実機で、Mac / Linux はフォントの文字幅からの再現（実機との一致率 98.8%）で動きます。
 
 ![デモ：修正前 → jp_fix_wrap.py → 修正後](images/demo.gif)
 
@@ -23,14 +23,21 @@ AI にスライドを作らせると、日本語は「専用｜フォルダ」�
 
 ![修正前後の比較（KPIカード）](images/before_after_kpi.png)
 
+### pptxgenjs / python-pptx で作った資料は、禁則処理が効いていない
+
+pptxgenjs はテキストの言語を `en-US` として書き出し、python-pptx は言語を書きません。PowerPoint は言語が `ja-JP` のテキストにしか日本語の禁則処理をしないので、どちらの場合も「、」「）」「ー」が行頭に、「（」が行末に来ます。600 個のテキストボックスで確かめたところ、`en-US` では禁則違反が 67 か所あり、`ja-JP` に変えると 0 か所になりました。
+
+`jp_fix_wrap.py` は泣き別れを直す前に、日本語の段落の言語を `ja-JP` に書き換えます。
+
 ## できること
 
 | | |
 |---|---|
 | 📐 **コンサル型の構成** | タイトル＝結論（メッセージライン）、エグゼクティブサマリー、現状→課題→打ち手、出所・ページ番号の作法を Claude に守らせる |
 | 🧩 **日本のビジネス資料の型 11 種** | 表紙・サマリー・課題整理・グラフ＋示唆・比較表・2×2・KPI・プロセス・ロードマップ・ネクストステップ・章扉 |
-| ✂️ **泣き別れの自動修正** | `jp_fix_wrap.py`：PowerPoint 実機の改行位置をもとに、文節の切れ目で改行し直す |
-| 🔍 **日本語資料のチェッカー** | `jp_lint.py`：はみ出し・泣き別れ・数字と単位の分離・テーマ名だけのタイトル・欧文フォント・文体の混在・表記ゆれなど 15 項目 |
+| ✂️ **泣き別れ・禁則違反の自動修正** | `jp_fix_wrap.py`：言語を ja-JP に直し、改行位置をもとに文節の切れ目で改行し直す |
+| 🔍 **日本語資料のチェッカー** | `jp_lint.py`：はみ出し・泣き別れ・禁則違反・数字と単位の分離・テーマ名だけのタイトル・欧文フォント・文体の混在・表記ゆれなど 17 項目 |
+| 🍎 **Mac / Linux 対応** | `jp_wrap_sim.py`：PowerPoint なしで、フォントの文字幅と禁則規則から改行位置を再現（`--simulate`） |
 | 🖼️ **実機レンダリング** | `render_slides.ps1`：PowerPoint 本体で PNG 化して目視確認（LibreOffice と違い、本番と同じ見た目） |
 
 ### サンプル（examples/sample.pptx）
@@ -60,10 +67,26 @@ Copy-Item -Recurse jp-business-slides\skills\japanese-business-slides "$env:USER
 
 ```bash
 npm install pptxgenjs
-pip install python-pptx budoux
+pip install python-pptx budoux fonttools
 ```
 
-泣き別れの検出・自動修正と画像化には **Windows + Microsoft PowerPoint** が必要です（PowerPoint 本体に改行位置を計算させるため）。Mac / Linux では文言・フォント・構成のチェックだけ動きます。
+改行位置の取り方は2通りあります。
+
+| | 改行位置の取り方 | 精度 |
+|---|---|---|
+| Windows + PowerPoint | PowerPoint 本体に計算させる（COM） | 実機そのもの |
+| Mac / Linux（`--simulate`） | フォントの文字幅と禁則規則から再現 | PowerPoint 実機との一致率 98.8%（下記） |
+
+**シミュレーションの精度**：600 個のテキストボックス（文・幅・書体・サイズ・太字の組み合わせ）を PowerPoint 実機でレイアウトさせ、段落ごとの改行がすべて一致するかを比べました（`tests/eval_wrap_sim.py`）。
+
+| 書体 | 一致率 |
+|---|---|
+| Yu Gothic（游ゴシック） | 100.0%（193/193） |
+| Meiryo（メイリオ） | 99.1%（210/212） |
+| BIZ UDPGothic | 97.4%（190/195） |
+| 全体 | 98.8%（593/600） |
+
+シミュレーションだけで直した資料を PowerPoint 実機で測り直すと、サンプル資料は泣き別れ・禁則違反が 10 件 → 0 件、python-pptx で作った資料は 9 件 → 1 件でした。Mac で Meiryo のように書体ファイルがない場合は近い書体で代用するので、精度は下がります。
 
 ## 使い方
 
@@ -81,12 +104,19 @@ Claude Code にふつうに頼むだけです。
 スクリプトを直接使うこともできます。
 
 ```bash
-# 既存の資料の泣き別れを自動修正（元ファイルは上書きしない）
+# 既存の資料の泣き別れ・禁則違反を自動修正（元ファイルは上書きしない）
 python skills/japanese-business-slides/scripts/jp_fix_wrap.py 提案書.pptx -o 提案書_修正版.pptx
 
 # チェック（PowerPoint の実際の改行位置を使う）
 powershell -ExecutionPolicy Bypass -File skills/japanese-business-slides/scripts/export_layout.ps1 -Pptx 提案書_修正版.pptx -Out layout.json
 python skills/japanese-business-slides/scripts/jp_lint.py 提案書_修正版.pptx --layout layout.json
+```
+
+Mac / Linux では `--simulate` を付けます。
+
+```bash
+python skills/japanese-business-slides/scripts/jp_fix_wrap.py 提案書.pptx -o 提案書_修正版.pptx --simulate
+python skills/japanese-business-slides/scripts/jp_lint.py 提案書_修正版.pptx --simulate
 ```
 
 出力例:
@@ -115,6 +145,8 @@ python skills/japanese-business-slides/scripts/jp_lint.py 提案書_修正版.pp
 | L2 | 単語の途中で改行されている（泣き別れ） |
 | L3 | 最終行が1〜2文字だけ |
 | L4 | 数字と単位が別の行に分かれている |
+| K1 | 禁則違反（「、」「）」「ー」が行頭、「（」が行末） |
+| K2 | 日本語のテキストの言語が ja-JP になっていない（禁則処理が効かない） |
 | T1–T4 | タイトルが空・句点つき・テーマ名だけ・長すぎる |
 | F1–F3 | 日本語に欧文フォント・本文12pt未満・書体の混在 |
 | S1 | グラフに出所がない |
@@ -128,10 +160,13 @@ skills/japanese-business-slides/
 └── scripts/
     ├── jpdeck.js         # 日本のビジネス資料の型（pptxgenjs）
     ├── jp_lint.py        # チェッカー
-    ├── jp_fix_wrap.py    # 泣き別れの自動修正
+    ├── jp_fix_wrap.py    # 泣き別れ・禁則違反の自動修正
+    ├── jp_wrap_sim.py    # PowerPoint の折り返しの再現（Mac / Linux 用）
     ├── export_layout.ps1 # PowerPoint 実機の改行位置を JSON に書き出す
     └── render_slides.ps1 # PowerPoint 実機で PNG に書き出す
 examples/sample.js        # サンプル資料の生成スクリプト
+tests/wrap_corpus.js      # 折り返し検証用の 600 ボックスを作る
+tests/eval_wrap_sim.py    # シミュレーションと PowerPoint 実機の一致率を測る
 ```
 
 ## 制限
@@ -139,6 +174,7 @@ examples/sample.js        # サンプル資料の生成スクリプト
 - 泣き別れの判定は BudouX の文節区切りに基づきます。固有名詞や専門用語で区切りが不自然な場合があります。
 - 1つの文節が1行より長い場合は、「・」「、」の後ろで切るか、言い回しの変更を提案します。
 - グラフ内の文字（軸ラベルなど）はチェック対象外です。
+- シミュレーションは段落の最初の run の書体・太字・言語で代表させます（サイズは文字ごとに見ます）。1つの段落で書体が混在すると誤差が出ます。
 
 ## このスキルについて
 

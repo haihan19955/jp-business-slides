@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""jp_fix_wrap.py — PowerPoint の「泣き別れ」（単語の途中での改行）を自動で直す
+"""jp_fix_wrap.py — PowerPoint の「泣き別れ」（単語の途中での改行）と禁則違反を自動で直す
 
-  python jp_fix_wrap.py deck.pptx -o deck_fixed.pptx
+  python jp_fix_wrap.py deck.pptx -o deck_fixed.pptx              # Windows + PowerPoint（実機で測る）
+  python jp_fix_wrap.py deck.pptx -o deck_fixed.pptx --simulate   # Mac / Linux（文字幅から再現）
 
-PowerPoint 実機で改行位置を取得 → 文節（BudouX）の途中で切れている箇所の直前に
-行内改行（Shift+Enter と同じ <a:br/>）を入れる → もう一度 PowerPoint で確認、を繰り返す。
+1. 日本語の段落のテキスト言語を ja-JP にする（en-US のままだと PowerPoint が禁則処理をせず、
+   「、」や「）」が行頭に来る。pptxgenjs や python-pptx で作った資料は en-US のことが多い）
+2. 改行位置を取得 → 文節（BudouX）の途中で切れている箇所の直前に行内改行
+   （Shift+Enter と同じ <a:br/>）を入れる → もう一度測る、を繰り返す
 既存の資料（このスキルで作っていない .pptx）にも使える。元ファイルは上書きしない。
 
-必要: Windows + PowerPoint、python-pptx、budoux
+必要: python-pptx、budoux。実機で測るなら Windows + PowerPoint、--simulate なら fonttools
 """
 import argparse
 import copy
@@ -22,7 +25,7 @@ import tempfile
 from pptx import Presentation
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from jp_lint import find_bad_breaks  # noqa: E402
+from jp_lint import JP_RE, find_bad_breaks  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
@@ -34,6 +37,33 @@ def export_layout(pptx_path, out_json):
     subprocess.run(cmd, check=True, capture_output=True, cwd=os.path.dirname(out_json) or ".")
     with open(out_json, encoding="utf-8-sig") as fh:
         return json.load(fh)
+
+
+def set_lang_ja(pptx_path):
+    """日本語を含む段落の run の言語を ja-JP にする。直した run の数を返す。
+
+    lang が en-US のときだけでなく、未指定のときも PowerPoint は日本語の禁則処理をしない
+    （tests/messy.pptx で確認）ので、未指定の run にも ja-JP を書く。
+    """
+    prs = Presentation(pptx_path)
+    changed = 0
+    for slide in prs.slides:
+        for p_elm in slide._element.iter(A + "p"):
+            text = "".join(t.text or "" for t in p_elm.iter(A + "t"))
+            if not JP_RE.search(text):
+                continue
+            for r in p_elm.findall(A + "r"):
+                rpr = r.find(A + "rPr")
+                if rpr is None:
+                    rpr = r.makeelement(A + "rPr", {})
+                    r.insert(0, rpr)
+                lang = rpr.get("lang")
+                if not lang or not lang.lower().startswith("ja"):
+                    rpr.set("lang", "ja-JP")
+                    rpr.set("altLang", "en-US")
+                    changed += 1
+    prs.save(pptx_path)
+    return changed
 
 
 def iter_shapes(shapes):
@@ -91,6 +121,8 @@ def main():
     ap.add_argument("pptx")
     ap.add_argument("-o", "--out", required=True)
     ap.add_argument("--rounds", type=int, default=5)
+    ap.add_argument("--simulate", action="store_true",
+                    help="PowerPoint を使わず、フォントの文字幅から改行位置を再現する（Mac / Linux 向け）")
     a = ap.parse_args()
 
     src, out = os.path.abspath(a.pptx), os.path.abspath(a.out)
@@ -100,8 +132,19 @@ def main():
     work = tempfile.mkdtemp(prefix="jpwrap_")
     total, unfixable = 0, []
 
+    n_lang = set_lang_ja(out)
+    if n_lang:
+        print(f"  テキストの言語を ja-JP に変更（{n_lang} か所）→ PowerPoint の禁則処理が効くようになる")
+
+    if a.simulate:
+        from jp_wrap_sim import simulate_deck
+        get_layout = lambda rnd: simulate_deck(out)[0]  # noqa: E731
+        print("  改行位置はシミュレーション（PowerPoint 実機との一致率は約99%）")
+    else:
+        get_layout = lambda rnd: export_layout(out, os.path.join(work, f"layout{rnd}.json"))  # noqa: E731
+
     for rnd in range(1, a.rounds + 1):
-        layout = export_layout(out, os.path.join(work, f"layout{rnd}.json"))
+        layout = get_layout(rnd)
         fixes, unfixable = [], []
         for f in layout:
             if "Slide Number" in f["shape"]:

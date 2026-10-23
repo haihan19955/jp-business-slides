@@ -42,6 +42,9 @@ TOPIC_ENDINGS = ("について", "の概要", "概要", "の現状", "まとめ"
                  "スケジュール", "体制", "目次", "アジェンダ", "はじめに", "背景", "目的")
 UNIT_START = ("円", "%", "％", "件", "時間", "か月", "ヶ月", "カ月", "万", "億", "千", "人", "名", "社", "倍", "年", "月", "日", "分", "秒", "個", "台", "点", "回")
 OK_BREAK_AFTER = set("、。，．・：；）」』】〕〉》！？!?)]:;/ 　")
+# 行頭禁則（PowerPoint の「標準」相当）と行末禁則。jp_wrap_sim.py もこれを使う
+NO_START = set("、。，．,.・：；:;？！?!）)］]｝}〕〉》」』】〙〗〟’”ゝゞ々ーぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮヵヶ%％‰℃°′″")
+NO_END = set("（(［[｛{〔〈《「『【〘〖〝‘“￥$＄＃#")
 YURE_PAIRS = [
     ("下さい", "ください"), ("出来", "でき"), ("頂き", "いただき"), ("頂け", "いただけ"), ("致し", "いたし"),
     ("全て", "すべて"), ("様々", "さまざま"), ("及び", "および"), ("又は", "または"), ("更に", "さらに"),
@@ -110,6 +113,7 @@ def is_title(shape):
 def check_deck(prs, rep):
     theme_ea = theme_ea_font(prs)
     jp_fonts = Counter()
+    non_ja_lang = Counter()
     all_text = []
     body_endings = Counter()
     n = len(prs.slides)
@@ -163,6 +167,9 @@ def check_deck(prs, rep):
                         if JP_RE.search(r.text):
                             if ea_eff and not ea_eff.startswith("+"):
                                 jp_fonts[ea_eff] += 1
+                            lang = rpr.get("lang") if rpr is not None else None
+                            if not lang or not lang.lower().startswith("ja"):
+                                non_ja_lang[lang or "未指定"] += 1
                             # ea が未指定なら PowerPoint は日本語フォントで代替表示するので問題にしない。
                             # 欧文専用フォントが明示されているときだけ指摘する（layout.json があればそちらの実フォントで再判定）。
                             if ea_eff and ea_eff.lower() in LATIN_ONLY_FONTS:
@@ -181,6 +188,10 @@ def check_deck(prs, rep):
             pass  # ページ番号はレイアウト側にある場合が多いので layout.json 側で判定する
 
     # --- デッキ全体 ---
+    if non_ja_lang:
+        langs = ", ".join(f"{k}（{v}か所）" for k, v in non_ja_lang.most_common())
+        rep.add("error", "K2", 0, f"日本語のテキストの言語が {langs} になっていて、PowerPoint の禁則処理が効かない",
+                "jp_fix_wrap.py で言語を ja-JP に直す（「、」「）」が行頭に来るのを防ぐ）。pptxgenjs で作るときは lang: \"ja-JP\" を指定する")
     if len(jp_fonts) > 2:
         rep.add("warn", "F3", 0, f"日本語フォントが{len(jp_fonts)}種類混在: {', '.join(jp_fonts)}", "見出し・本文あわせて1〜2書体にそろえる")
     if body_endings["desu"] >= 2 and body_endings["dearu"] >= 2:
@@ -272,6 +283,13 @@ def check_layout(layout, rep):
                 else:
                     rep.add("error", "L2", sl, f"単語の途中で改行されている（泣き別れ）: {ctx}", f"「{b['phrase']}」の前で改行する（{how}）", where)
             lines = [l for l in p["lines"] if l]
+            for prev, nxt in zip(lines, lines[1:]):
+                if nxt[0] in NO_START:
+                    rep.add("error", "K1", sl, f"「{nxt[0]}」が行頭に来ている（禁則違反）: 「…{prev[-8:]}｜{nxt[:8]}…」",
+                            "テキストの言語を ja-JP にすると PowerPoint が禁則処理をする（jp_fix_wrap.py で自動修正）", where)
+                elif prev.rstrip()[-1:] in NO_END:
+                    rep.add("error", "K1", sl, f"「{prev.rstrip()[-1]}」が行末に来ている（禁則違反）: 「…{prev[-8:]}｜{nxt[:8]}…」",
+                            "テキストの言語を ja-JP にすると PowerPoint が禁則処理をする（jp_fix_wrap.py で自動修正）", where)
             tail = re.sub(r"[、。）」]", "", lines[-1]) if lines else ""
             if 0 < len(tail) <= 2 and len(lines) >= 2:
                 rep.add("warn", "L3", sl, f"最終行が{len(tail)}文字だけ: 「…{lines[-2][-6:]}｜{lines[-1]}」",
@@ -282,6 +300,8 @@ def main():
     ap = argparse.ArgumentParser(description="日本語ビジネス資料（.pptx）の品質チェッカー")
     ap.add_argument("pptx")
     ap.add_argument("--layout", help="export_layout.ps1 が出力した JSON")
+    ap.add_argument("--simulate", action="store_true",
+                    help="PowerPoint を使わず、フォントの文字幅から改行位置を再現してチェックする（Mac / Linux 向け）")
     ap.add_argument("--json", action="store_true", help="JSON で出力")
     a = ap.parse_args()
 
@@ -291,6 +311,13 @@ def main():
     if a.layout:
         with open(a.layout, encoding="utf-8-sig") as fh:
             check_layout(json.load(fh), rep)
+    elif a.simulate:
+        from jp_wrap_sim import simulate_deck
+        layout, notes = simulate_deck(a.pptx)
+        for n in notes:
+            print(f"note: {n}", file=sys.stderr)
+        print("note: 改行位置はシミュレーション（PowerPoint 実機との一致率は約99%）", file=sys.stderr)
+        check_layout(layout, rep)
     elif _PARSER is None:
         print("note: budoux 未インストールのため泣き別れチェックは無効", file=sys.stderr)
 
