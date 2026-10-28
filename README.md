@@ -47,9 +47,18 @@ pptxgenjs はテキストの言語を `en-US` として書き出し、python-ppt
 
 ![サンプル資料の一覧](images/gallery.png)
 
-## インストール
+## インストール（1分）
 
-### Claude Code
+### 1. スキルを入れる（コマンド1つ）
+
+```bash
+npx skills add haihan19955/jp-business-slides
+```
+
+[skills](https://skills.sh) CLI が Claude Code などのエージェントを見つけて、スキルをそのフォルダに入れます。
+
+<details>
+<summary>手動で入れる場合（git clone）</summary>
 
 ```bash
 git clone https://github.com/haihan19955/jp-business-slides.git
@@ -63,6 +72,12 @@ Windows（PowerShell）の場合:
 git clone https://github.com/haihan19955/jp-business-slides.git
 Copy-Item -Recurse jp-business-slides\skills\japanese-business-slides "$env:USERPROFILE\.claude\skills\"
 ```
+
+</details>
+
+### 2. 既存の資料で試す
+
+依存パッケージ（下記）を入れたら、Claude Code に「この提案書.pptx の泣き別れをチェックして直して」と頼むだけです。
 
 ### 依存パッケージ
 
