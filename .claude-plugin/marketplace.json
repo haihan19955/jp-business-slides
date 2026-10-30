@@ -1,0 +1,12 @@
+{
+  "name": "jp-business-slides",
+  "owner": { "name": "haihan19955", "url": "https://github.com/haihan19955" },
+  "metadata": { "description": "日本語のパワポ資料を社外に出せる品質で作る Claude スキル" },
+  "plugins": [
+    {
+      "name": "jp-business-slides",
+      "source": "./",
+      "description": "日本語のビジネス資料を作る Claude スキル。泣き別れ・禁則違反を自動で直します。"
+    }
+  ]
+}

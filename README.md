@@ -58,6 +58,20 @@ npx skills add haihan19955/jp-business-slides
 [skills](https://skills.sh) CLI が Claude Code などのエージェントを見つけて、スキルをそのフォルダに入れます。
 
 <details>
+<summary>Claude Code のプラグインとして入れる場合</summary>
+
+Claude Code の中で次の 2 行を実行します。
+
+```
+/plugin marketplace add haihan19955/jp-business-slides
+/plugin install jp-business-slides@jp-business-slides
+```
+
+プラグインとして入れたスキルは `jp-business-slides:japanese-business-slides` という名前で表示されます。
+
+</details>
+
+<details>
 <summary>手動で入れる場合（git clone）</summary>
 
 ```bash
