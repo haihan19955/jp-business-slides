@@ -1,7 +1,7 @@
 {
   "name": "jp-business-slides",
   "version": "1.1.0",
-  "description": "日本語のビジネス資料を作る Claude スキル。泣き別れ・禁則違反（ja-JP 未指定）を自動で直し、17 項目のチェッカー付き。",
+  "description": "日本語のビジネス資料を作る Claude スキル。泣き別れ・禁則違反（ja-JP 未指定）を自動で直し、18 項目のチェッカー付き。",
   "author": { "name": "haihan19955", "url": "https://github.com/haihan19955" },
   "homepage": "https://github.com/haihan19955/jp-business-slides",
   "repository": "https://github.com/haihan19955/jp-business-slides",

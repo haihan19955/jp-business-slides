@@ -116,6 +116,28 @@ def insert_break(p_elm, offset):
     return False
 
 
+def deck_text(pptx_path):
+    """スライド番号ごとの段落テキストの一覧を返す（<a:br/> は文字を持たないので数えない）。"""
+    prs = Presentation(pptx_path)
+    return [["".join(t.text or "" for t in p_elm.iter(A + "t"))
+             for p_elm in slide._element.iter(A + "p")]
+            for slide in prs.slides]
+
+
+def text_diffs(before, after):
+    """2つの deck_text の違いを [(スライド番号, 段落番号, 前, 後)] で返す。"""
+    diffs = []
+    for no in range(max(len(before), len(after))):
+        b = before[no] if no < len(before) else []
+        c = after[no] if no < len(after) else []
+        for i in range(max(len(b), len(c))):
+            old = b[i] if i < len(b) else None
+            new = c[i] if i < len(c) else None
+            if old != new:
+                diffs.append((no + 1, i, old, new))
+    return diffs
+
+
 def main():
     ap = argparse.ArgumentParser(description="PowerPoint の泣き別れを自動修正する")
     ap.add_argument("pptx")
@@ -171,7 +193,18 @@ def main():
         if done == 0:
             break
 
+    # 直すのは改行と言語だけ。文字が1字でも変わっていたら失敗にする
+    before = deck_text(src)
+    diffs = text_diffs(before, deck_text(out))
+    if diffs:
+        shutil.rmtree(work, ignore_errors=True)
+        os.remove(out)
+        for sl, i, old, new in diffs[:10]:
+            print(f"  スライド{sl} 段落{i}: 「{old}」→「{new}」", file=sys.stderr)
+        sys.exit(f"文字が {len(diffs)} 段落で変わったため、出力を削除しました（ツールの不具合です）")
+
     print(f"\n修正 {total} か所 → {out}")
+    print(f"文字の照合: {sum(len(s) for s in before)} 段落すべて元と同じ")
     if unfixable:
         print(f"自動では直せない箇所 {len(unfixable)} 件（文節が1行より長い）:")
         for sl, where, b in unfixable:
